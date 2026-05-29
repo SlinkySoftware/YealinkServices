@@ -1,0 +1,16 @@
+[Unit]
+Description=yealinkService Django application
+After=network.target
+
+[Service]
+Type=simple
+User=yealinkservice
+Group=yealinkservice
+WorkingDirectory=/opt/yealinkService
+EnvironmentFile=/etc/yealinkService/phone-services.env
+ExecStart=/opt/yealinkService/.venv/bin/gunicorn yealinkService.wsgi:application --bind 127.0.0.1:8001 --workers 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

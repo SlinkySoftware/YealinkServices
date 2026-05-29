@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<YealinkIPPhoneInputScreen>
+  <Title>{{ branding_title }}</Title>
+  <Prompt>Enter diversion destination</Prompt>
+  <URL>{{ set_url }}</URL>
+  <Parameter>destination</Parameter>
+  <DefaultValue>{{ default_destination }}</DefaultValue>
+  <InputFlags>T</InputFlags>
+  <CancelURL>{{ cancel_url }}</CancelURL>
+</YealinkIPPhoneInputScreen>

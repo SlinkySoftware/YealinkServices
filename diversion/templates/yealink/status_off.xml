@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<YealinkIPPhoneTextMenu>
+  <Title>{{ branding_title }}</Title>
+  <Prompt>Extension: {{ dn }}
+Status: Not diverted</Prompt>
+  <MenuItem>
+    <Prompt>Divert</Prompt>
+    <URI>{{ enable_url }}</URI>
+  </MenuItem>
+  <MenuItem>
+    <Prompt>Refresh</Prompt>
+    <URI>{{ refresh_url }}</URI>
+  </MenuItem>
+  <MenuItem>
+    <Prompt>Exit</Prompt>
+    <URI>{{ exit_url }}</URI>
+  </MenuItem>
+</YealinkIPPhoneTextMenu>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<YealinkIPPhoneTextScreen Timeout="3">
+  <Title>ExampleCorp Phone Services</Title>
+  <Text>Call Diversion Enabled
+Extension: +61288836500
+To: +61299991234</Text>
+  <URL>http://phoneservices.example.internal/services/refresh/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URL>
+</YealinkIPPhoneTextScreen>

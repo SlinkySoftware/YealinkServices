@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<YealinkIPPhoneTextScreen Timeout="3">
+  <Title>{{ branding_title }}</Title>
+  <Text>Call Diversion Disabled
+Extension: {{ dn }}</Text>
+  <URL>{{ refresh_url }}</URL>
+</YealinkIPPhoneTextScreen>
