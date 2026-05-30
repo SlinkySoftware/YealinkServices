@@ -71,7 +71,7 @@ The handset templates default to text branding. The logo URLs are exposed in tem
 ./dev.sh start
 ```
 
-The root [dev.sh](dev.sh) helper supports `setup`, `start`, `stop`, `restart`, and `status`. It uses `.venv`, writes runtime state to `.dev-runtime/`, defaults `DEBUG=true`, and binds Django to `0.0.0.0:8001`. Override the bind target with `DEV_HOST` and `DEV_PORT` if needed.
+The root [dev.sh](dev.sh) helper supports `setup`, `start`, `stop`, `restart`, and `status`. It uses `.venv`, writes runtime state to `.dev-runtime/`, defaults `DEBUG=true`, and binds Django to `0.0.0.0:8001`. It automatically sources [.dev.env](.dev.env) before applying dev fallbacks; override the file location with `DEV_ENV_FILE` if needed. Override the bind target with `DEV_HOST` and `DEV_PORT` if needed.
 
 ## Test suite
 

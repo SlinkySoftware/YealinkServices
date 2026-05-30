@@ -3,12 +3,27 @@
 set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DEV_ENV_FILE="${DEV_ENV_FILE:-${ROOT_DIR}/.dev.env}"
+
+load_dev_env_file() {
+    if [[ ! -f "${DEV_ENV_FILE}" ]]; then
+        return
+    fi
+
+    set -a
+    # shellcheck disable=SC1090
+    source "${DEV_ENV_FILE}"
+    set +a
+}
+
+load_dev_env_file
+
 VENV_DIR="${ROOT_DIR}/.venv"
 VENV_PYTHON="${VENV_DIR}/bin/python"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 RUNTIME_DIR="${ROOT_DIR}/.dev-runtime"
 PID_FILE="${RUNTIME_DIR}/django.pid"
-LOG_FILE="${RUNTIME_DIR}/django.log"
+SERVER_LOG_FILE="${RUNTIME_DIR}/django.log"
 HOST="${DEV_HOST:-0.0.0.0}"
 PORT="${DEV_PORT:-8001}"
 
@@ -25,6 +40,7 @@ Commands:
 
 Environment overrides:
   PYTHON_BIN            Python used to create the virtualenv (default: python3)
+    DEV_ENV_FILE          Shell env file loaded before defaults (default: ./.dev.env)
   DEV_HOST              Bind host for runserver (default: 0.0.0.0)
   DEV_PORT              Bind port for runserver (default: 8001)
   DJANGO_SECRET_KEY     Defaults to a local development value
@@ -104,7 +120,7 @@ start() {
 
     if is_running; then
         printf 'Django dev server is already running (PID %s).\n' "${pid}"
-        printf 'Log: %s\n' "${LOG_FILE}"
+        printf 'Log: %s\n' "${SERVER_LOG_FILE}"
         return 0
     fi
 
@@ -114,22 +130,22 @@ start() {
     fi
 
     run_manage_check
-    : > "${LOG_FILE}"
+    : > "${SERVER_LOG_FILE}"
 
     (
         cd "${ROOT_DIR}"
-        setsid "${VENV_PYTHON}" manage.py runserver "${HOST}:${PORT}" >>"${LOG_FILE}" 2>&1 &
+        setsid "${VENV_PYTHON}" manage.py runserver "${HOST}:${PORT}" >>"${SERVER_LOG_FILE}" 2>&1 &
         server_pid=$!
         printf '%s\n' "${server_pid}" > "${PID_FILE}"
     )
 
     if is_running; then
         printf 'Started Django dev server (PID %s) on http://localhost:%s\n' "${pid}" "${PORT}"
-        printf 'Log: %s\n' "${LOG_FILE}"
+        printf 'Log: %s\n' "${SERVER_LOG_FILE}"
         return 0
     fi
 
-    printf 'Failed to start Django dev server. Check %s\n' "${LOG_FILE}" >&2
+    printf 'Failed to start Django dev server. Check %s\n' "${SERVER_LOG_FILE}" >&2
     exit 1
 }
 
@@ -153,7 +169,7 @@ stop() {
 status() {
     if is_running; then
         printf 'Django dev server is running (PID %s) on %s:%s\n' "${pid}" "${HOST}" "${PORT}"
-        printf 'Log: %s\n' "${LOG_FILE}"
+        printf 'Log: %s\n' "${SERVER_LOG_FILE}"
         return 0
     fi
 
