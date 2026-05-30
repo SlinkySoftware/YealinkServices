@@ -67,13 +67,11 @@ The handset templates default to text branding. The logo URLs are exposed in tem
 ## Local setup
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-export DJANGO_SECRET_KEY=dev-only-change-me
-python manage.py check
-python manage.py runserver 0.0.0.0:8001
+./dev.sh setup
+./dev.sh start
 ```
+
+The root [dev.sh](dev.sh) helper supports `setup`, `start`, `stop`, `restart`, and `status`. It uses `.venv`, writes runtime state to `.dev-runtime/`, defaults `DEBUG=true`, and binds Django to `0.0.0.0:8001`. Override the bind target with `DEV_HOST` and `DEV_PORT` if needed.
 
 ## Test suite
 

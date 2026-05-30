@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+htmlcov/
+django.sqlite3
+*.log
+.dev-runtime/
