@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import urlencode, urljoin
+from urllib.parse import unquote, urlencode, urljoin
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
@@ -43,7 +43,20 @@ def parse_handset_request(request: HttpRequest) -> HandsetRequestParams:
     token = get_query_param(request, "token")
     if not mac or not dn or not token:
         raise HandsetRequestError("Missing required handset request parameters")
-    return HandsetRequestParams(mac=mac, dn=dn, token=token)
+
+    normalized_mac = _normalize_mac(mac)
+    if normalized_mac is None:
+        raise HandsetRequestError("Invalid handset MAC address")
+
+    return HandsetRequestParams(mac=normalized_mac, dn=dn, token=token)
+
+
+def _normalize_mac(mac: str) -> str | None:
+    decoded_mac = unquote(mac).strip().upper()
+    normalized_mac = "".join(character for character in decoded_mac if character in "0123456789ABCDEF")
+    if len(normalized_mac) != 12:
+        return None
+    return normalized_mac
 
 
 def build_screen_context(

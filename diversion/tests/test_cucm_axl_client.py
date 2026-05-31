@@ -6,6 +6,7 @@ from pathlib import Path
 
 import requests
 import pytest
+from zeep import xsd
 from zeep.exceptions import Fault
 
 from diversion.cucm_axl_client import (
@@ -172,6 +173,39 @@ def test_update_line_retries_transient_failures() -> None:
     client.update_call_forward_all("+61288836500", "INTERNAL", current_state, "+61299991234")
 
     assert attempts["count"] == 3
+
+
+def test_update_line_uses_explicit_nil_destination_when_clearing() -> None:
+    calls = []
+
+    class FakeService:
+        pass
+
+    fake_service = attach_axl_operations(
+        FakeService(),
+        getLine=lambda **kwargs: {
+            "return": {
+                "line": {
+                    "callForwardAll": {
+                        "destination": "+61299991234",
+                        "callingSearchSpaceName": "INTERNAL_CSS",
+                        "secondaryCallingSearchSpaceName": "SECONDARY_CSS",
+                        "forwardToVoiceMail": False,
+                    }
+                }
+            }
+        },
+        updateLine=lambda **kwargs: calls.append(kwargs) or {"return": {}},
+    )
+
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
+    fake_client.service = fake_service
+    client = build_client(fake_client)
+
+    current_state = client.get_line("+61288836500", "INTERNAL")
+    client.update_call_forward_all("+61288836500", "INTERNAL", current_state, None)
+
+    assert calls[0]["callForwardAll"]["destination"] is xsd.Nil
 
 
 def test_supports_apply_line_false_when_operation_missing() -> None:

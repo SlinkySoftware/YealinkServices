@@ -14,7 +14,7 @@ import requests
 import urllib3
 from requests import Session
 from requests.adapters import HTTPAdapter
-from zeep import Client
+from zeep import Client, xsd
 from zeep.exceptions import Fault, TransportError
 from zeep.helpers import serialize_object
 from zeep.transports import Transport
@@ -218,7 +218,7 @@ class CucmAxlClient:
                 "forwardToVoiceMail": False,
                 "callingSearchSpaceName": current_state.calling_search_space_name,
                 "secondaryCallingSearchSpaceName": current_state.secondary_calling_search_space_name,
-                "destination": destination,
+                "destination": xsd.Nil if destination is None else destination,
             },
         )
 

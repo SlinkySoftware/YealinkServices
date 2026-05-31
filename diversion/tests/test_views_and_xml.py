@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 from django.template.loader import render_to_string
-from django.test import Client, override_settings
+from django.test import Client, RequestFactory, override_settings
 
 from diversion.cucm_axl_client import CallForwardAllState
 from diversion.phone_manager_client import DeviceContext
 from diversion.services import DiversionStatus
-from diversion.yealink_xml import HandsetRequestParams, build_screen_context
+from diversion.yealink_xml import HandsetRequestParams, build_screen_context, parse_handset_request
 
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "yealink"
@@ -118,6 +118,31 @@ def test_status_view_renders_diverted_screen(monkeypatch) -> None:
     assert response.status_code == 200
     assert b"Status: Diverted" in response.content
     assert b"+61299991234" in response.content
+
+
+@override_settings(
+    PHONE_SERVICES_BASE_URL="http://phoneservices.example.internal/services/",
+    PHONE_SERVICES_COMPANY_NAME="ExampleCorp",
+)
+@pytest.mark.parametrize(
+    "request_mac",
+    [
+        "C4:FC:22:4C:78:17",
+        "C4%3AFC%3A22%3A4C%3A78%3A17",
+    ],
+)
+def test_parse_handset_request_normalizes_mac_and_generated_urls(request_mac: str) -> None:
+    request = RequestFactory().get(
+        "/services/",
+        {"mac": request_mac, "dn": "+61288836500", "token": "abcd1234"},
+    )
+
+    params = parse_handset_request(request)
+    context = build_screen_context(params)
+
+    assert params.mac == "C4FC224C7817"
+    assert "mac=C4FC224C7817" in context["enable_url"]
+    assert "%3A" not in context["enable_url"]
 
 
 @override_settings(AXL_WSDL_ROOT=Path(__file__).resolve().parents[2] / "wsdl")
