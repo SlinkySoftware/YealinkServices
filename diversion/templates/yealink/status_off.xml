@@ -16,6 +16,6 @@
   </SoftKey>
   <SoftKey index="4">
     <Label>Exit</Label>
-    <URI>Softkey:Exit</URI>
+    <URI>SoftKey:Exit</URI>
   </SoftKey>
 </YealinkIPPhoneImageScreen>
