@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<YealinkIPPhoneTextScreen Timeout="3">
+<YealinkIPPhoneTextScreen Timeout="6"
+  Beep="no"
+>
   <Title>{{ branding_title }}</Title>
   <Text>Call Diversion is Unavailable</Text>
-  <URL>{{ refresh_url|default:"" }}</URL>
 </YealinkIPPhoneTextScreen>

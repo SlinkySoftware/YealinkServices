@@ -1,24 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<YealinkIPPhoneTextMenu>
-  <Title>{{ branding_title }}</Title>
-  <Prompt>Extension: {{ dn }}
-Divert: {{ diversion_destination }}</Prompt>
-  <MenuItem>
-    <Prompt>Divert</Prompt>
+<YealinkIPPhoneImageScreen Beep="no"
+>
+  <Image
+    verticalAlign="middle"
+    horizontalAlign="middle"
+  >{{ header_logo_url }}</Image>
+  <SoftKey index="1">
+    <Label>Turn On</Label>
     <URI>{{ enable_url }}</URI>
-  </MenuItem>
-  <MenuItem>
-    <Prompt>Refresh</Prompt>
+  </SoftKey>
+
+  <SoftKey index="3">
+    <Label>Refresh</Label>
     <URI>{{ refresh_url }}</URI>
-  </MenuItem>
-  <SoftKeyItem>
-    <Name>Divert</Name>
-    <URL>{{ enable_url }}</URL>
-    <Position>1</Position>
-  </SoftKeyItem>
-  <SoftKeyItem>
-    <Name>Refresh</Name>
-    <URL>{{ refresh_url }}</URL>
-    <Position>3</Position>
-  </SoftKeyItem>
-</YealinkIPPhoneTextMenu>
+  </SoftKey>
+  <SoftKey index="4">
+    <Label>Exit</Label>
+    <URI>Command:Clear</URI>
+  </SoftKey>
+</YealinkIPPhoneImageScreen>
