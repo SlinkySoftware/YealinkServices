@@ -14,7 +14,7 @@ import requests
 import urllib3
 from requests import Session
 from requests.adapters import HTTPAdapter
-from zeep import Client, xsd
+from zeep import Client
 from zeep.exceptions import Fault, TransportError
 from zeep.helpers import serialize_object
 from zeep.transports import Transport
@@ -67,7 +67,6 @@ class CallForwardAllState:
     destination: str | None
     calling_search_space_name: str | None
     secondary_calling_search_space_name: str | None
-    forward_to_voice_mail: bool
 
     @property
     def enabled(self) -> bool:
@@ -174,7 +173,6 @@ class CucmAxlClient:
                     "destination": "",
                     "callingSearchSpaceName": "",
                     "secondaryCallingSearchSpaceName": "",
-                    "forwardToVoiceMail": "",
                 },
             },
         )
@@ -200,7 +198,6 @@ class CucmAxlClient:
             secondary_calling_search_space_name=self._fk_type_to_string(
                 call_forward_all.get("secondaryCallingSearchSpaceName")
             ),
-            forward_to_voice_mail=bool(call_forward_all.get("forwardToVoiceMail", False)),
         )
 
     def update_call_forward_all(
@@ -215,10 +212,9 @@ class CucmAxlClient:
             pattern=self._escape_pattern(pattern),
             routePartitionName=route_partition_name,
             callForwardAll={
-                "forwardToVoiceMail": False,
                 "callingSearchSpaceName": current_state.calling_search_space_name,
                 "secondaryCallingSearchSpaceName": current_state.secondary_calling_search_space_name,
-                "destination": xsd.Nil if destination is None else destination,
+                "destination": "" if destination is None else destination,
             },
         )
 

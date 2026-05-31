@@ -52,7 +52,6 @@ class FakeCucmClient:
             destination=destination,
             calling_search_space_name=current_state.calling_search_space_name,
             secondary_calling_search_space_name=current_state.secondary_calling_search_space_name,
-            forward_to_voice_mail=False,
         )
 
     def apply_line(self, pattern: str, route_partition_name: str) -> None:
@@ -70,7 +69,6 @@ def test_enable_diversion_idempotent_when_destination_matches() -> None:
         destination="+61299991234",
         calling_search_space_name="INTERNAL_CSS",
         secondary_calling_search_space_name="SECONDARY_CSS",
-        forward_to_voice_mail=False,
     )
     cucm_client = FakeCucmClient(current_state)
     service = CallDiversionService(
@@ -99,7 +97,6 @@ def test_disable_diversion_returns_status_when_already_disabled() -> None:
         destination=None,
         calling_search_space_name="INTERNAL_CSS",
         secondary_calling_search_space_name="SECONDARY_CSS",
-        forward_to_voice_mail=False,
     )
     service = CallDiversionService(
         phone_manager_client=FakePhoneManagerClient(),
@@ -126,7 +123,6 @@ def test_dry_run_enable_skips_update_line() -> None:
         destination=None,
         calling_search_space_name="INTERNAL_CSS",
         secondary_calling_search_space_name="SECONDARY_CSS",
-        forward_to_voice_mail=False,
     )
     cucm_client = FakeCucmClient(current_state)
     service = CallDiversionService(
@@ -159,7 +155,6 @@ def test_enable_diversion_rejects_short_destination() -> None:
                 destination=None,
                 calling_search_space_name="INTERNAL_CSS",
                 secondary_calling_search_space_name="SECONDARY_CSS",
-                forward_to_voice_mail=False,
             )
         ),
         route_partition_name="INTERNAL",

@@ -104,7 +104,6 @@ def test_status_view_renders_diverted_screen(monkeypatch) -> None:
                     destination="+61299991234",
                     calling_search_space_name="INTERNAL_CSS",
                     secondary_calling_search_space_name="SECONDARY_CSS",
-                    forward_to_voice_mail=False,
                 ),
             )
 

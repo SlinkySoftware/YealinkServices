@@ -193,7 +193,6 @@ class CallDiversionService:
             simulated_state = replace(
                 current_state,
                 destination=normalized_destination,
-                forward_to_voice_mail=False,
             )
             log_audit(
                 request_id=audit_context.request_id,
@@ -334,7 +333,6 @@ class CallDiversionService:
             simulated_state = replace(
                 current_state,
                 destination=None,
-                forward_to_voice_mail=False,
             )
             log_audit(
                 request_id=audit_context.request_id,

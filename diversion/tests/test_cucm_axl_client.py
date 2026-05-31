@@ -6,7 +6,6 @@ from pathlib import Path
 
 import requests
 import pytest
-from zeep import xsd
 from zeep.exceptions import Fault
 
 from diversion.cucm_axl_client import (
@@ -120,7 +119,6 @@ def test_get_line_returns_call_forward_state() -> None:
                         "destination": "+61299991234",
                         "callingSearchSpaceName": "INTERNAL_CSS",
                         "secondaryCallingSearchSpaceName": "SECONDARY_CSS",
-                        "forwardToVoiceMail": False,
                     }
                 }
             }
@@ -137,7 +135,6 @@ def test_get_line_returns_call_forward_state() -> None:
         destination="+61299991234",
         calling_search_space_name="INTERNAL_CSS",
         secondary_calling_search_space_name="SECONDARY_CSS",
-        forward_to_voice_mail=False,
     )
     assert calls[0]["pattern"] == "\\+61288836500"
 
@@ -157,7 +154,6 @@ def test_update_line_retries_transient_failures() -> None:
                         "destination": None,
                         "callingSearchSpaceName": "INTERNAL_CSS",
                         "secondaryCallingSearchSpaceName": "SECONDARY_CSS",
-                        "forwardToVoiceMail": False,
                     }
                 }
             }
@@ -175,7 +171,7 @@ def test_update_line_retries_transient_failures() -> None:
     assert attempts["count"] == 3
 
 
-def test_update_line_uses_explicit_nil_destination_when_clearing() -> None:
+def test_update_line_uses_empty_destination_when_clearing() -> None:
     calls = []
 
     class FakeService:
@@ -190,7 +186,6 @@ def test_update_line_uses_explicit_nil_destination_when_clearing() -> None:
                         "destination": "+61299991234",
                         "callingSearchSpaceName": "INTERNAL_CSS",
                         "secondaryCallingSearchSpaceName": "SECONDARY_CSS",
-                        "forwardToVoiceMail": False,
                     }
                 }
             }
@@ -205,7 +200,7 @@ def test_update_line_uses_explicit_nil_destination_when_clearing() -> None:
     current_state = client.get_line("+61288836500", "INTERNAL")
     client.update_call_forward_all("+61288836500", "INTERNAL", current_state, None)
 
-    assert calls[0]["callForwardAll"]["destination"] is xsd.Nil
+    assert calls[0]["callForwardAll"]["destination"] == ""
 
 
 def test_supports_apply_line_false_when_operation_missing() -> None:
