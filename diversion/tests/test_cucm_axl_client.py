@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import logging
 import ssl
 from pathlib import Path
 
 import requests
+import pytest
+from zeep.exceptions import Fault
 
-from diversion.cucm_axl_client import CallForwardAllState, CucmAxlClient, TlsCompatibilityAdapter
+from diversion.cucm_axl_client import (
+    CallForwardAllState,
+    CucmAxlClient,
+    CucmAxlError,
+    TlsCompatibilityAdapter,
+)
 
 
 TEST_WSDL_PATH = str(Path(__file__).resolve().parent / "fixtures" / "AXLAPI.wsdl")
@@ -176,6 +184,35 @@ def test_legacy_tls_compatibility_mounts_custom_ssl_context() -> None:
     assert adapter._ssl_context.maximum_version == ssl.TLSVersion.TLSv1_2
     assert adapter._ssl_context.verify_mode == ssl.CERT_NONE
     assert any(cipher["name"] == "AES128-SHA" for cipher in adapter._ssl_context.get_ciphers())
+
+
+def test_fault_logging_includes_fault_detail(caplog: pytest.LogCaptureFixture) -> None:
+    class FakeService:
+        pass
+
+    def raise_fault(**kwargs):
+        raise Fault(
+            "Unknown fault occured",
+            code="SOAP-ENV:Server",
+            detail={"axlcode": "5007", "axlmessage": "Line not found"},
+        )
+
+    fake_service = attach_axl_operations(
+        FakeService(),
+        getLine=raise_fault,
+    )
+
+    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client.service = fake_service
+    client = build_client(fake_client)
+
+    with caplog.at_level(logging.ERROR, logger="diversion.cucm_axl_client"):
+        with pytest.raises(CucmAxlError, match="Unknown fault occured"):
+            client.get_line("+61288836500", "INTERNAL")
+
+    assert "operation=getLine" in caplog.text
+    assert '"axlcode": "5007"' in caplog.text
+    assert '"axlmessage": "Line not found"' in caplog.text
 
 
 def _transient_update(attempts: dict[str, int]):

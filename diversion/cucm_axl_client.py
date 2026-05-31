@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,6 +20,7 @@ from zeep.transports import Transport
 AXL_BINDING = "{http://www.cisco.com/AXLAPIService/}AXLAPIBinding"
 TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
 DEFAULT_LEGACY_TLS_CIPHERS = "AES128-SHA:@SECLEVEL=0"
+LOGGER = logging.getLogger(__name__)
 
 
 class TlsCompatibilityAdapter(HTTPAdapter):
@@ -115,6 +118,11 @@ class CucmAxlClient:
         try:
             line = payload["return"]["line"]
         except (KeyError, TypeError) as exc:
+            LOGGER.exception(
+                "Unexpected CUCM getLine response structure endpoint=%s payload=%s",
+                self.endpoint,
+                self._format_for_log(payload),
+            )
             raise CucmAxlError("Unexpected getLine response structure") from exc
 
         call_forward_all = line.get("callForwardAll") or {}
@@ -168,13 +176,46 @@ class CucmAxlClient:
             try:
                 return operation(**kwargs)
             except Fault as exc:
+                LOGGER.exception(
+                    (
+                        "CUCM AXL fault operation=%s endpoint=%s attempt=%s "
+                        "kwargs=%s code=%r actor=%r subcodes=%r detail=%s"
+                    ),
+                    operation_name,
+                    self.endpoint,
+                    attempt,
+                    self._format_for_log(kwargs),
+                    getattr(exc, "code", None),
+                    getattr(exc, "actor", None),
+                    getattr(exc, "subcodes", None),
+                    self._format_for_log(getattr(exc, "detail", None)),
+                )
                 raise CucmAxlError(f"CUCM AXL fault on {operation_name}: {exc}") from exc
             except TransportError as exc:
                 if not self._is_transient_transport_error(exc) or attempt == 3:
+                    LOGGER.exception(
+                        (
+                            "CUCM transport error operation=%s endpoint=%s attempt=%s "
+                            "kwargs=%s status_code=%r content=%s"
+                        ),
+                        operation_name,
+                        self.endpoint,
+                        attempt,
+                        self._format_for_log(kwargs),
+                        getattr(exc, "status_code", None),
+                        self._format_for_log(getattr(exc, "content", None)),
+                    )
                     raise CucmAxlError(f"CUCM transport error on {operation_name}: {exc}") from exc
                 last_exception = exc
             except (requests.ConnectionError, requests.Timeout) as exc:
                 if attempt == 3:
+                    LOGGER.exception(
+                        "CUCM connection error operation=%s endpoint=%s attempt=%s kwargs=%s",
+                        operation_name,
+                        self.endpoint,
+                        attempt,
+                        self._format_for_log(kwargs),
+                    )
                     raise CucmAxlError(f"CUCM connection error on {operation_name}: {exc}") from exc
                 last_exception = exc
 
@@ -247,3 +288,15 @@ class CucmAxlClient:
         if extracted is not None:
             return cls._as_optional_string(extracted)
         return cls._as_optional_string(value)
+
+    @staticmethod
+    def _format_for_log(value: object) -> str:
+        try:
+            serialized = serialize_object(value)
+        except Exception:
+            serialized = value
+
+        try:
+            return json.dumps(serialized, default=str, sort_keys=True)
+        except TypeError:
+            return repr(serialized)
