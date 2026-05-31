@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import ssl
 from pathlib import Path
 
 import requests
 
-from diversion.cucm_axl_client import CallForwardAllState, CucmAxlClient
+from diversion.cucm_axl_client import CallForwardAllState, CucmAxlClient, TlsCompatibilityAdapter
 
 
 TEST_WSDL_PATH = str(Path(__file__).resolve().parent / "fixtures" / "AXLAPI.wsdl")
@@ -133,6 +134,48 @@ def test_supports_apply_line_false_when_operation_missing() -> None:
     client = build_client(fake_client)
 
     assert client.supports_apply_line() is False
+
+
+def test_legacy_tls_compatibility_mounts_custom_ssl_context() -> None:
+    class FakeService:
+        pass
+
+    fake_service = attach_axl_operations(
+        FakeService(),
+        getLine=lambda **kwargs: {"return": {"line": {"callForwardAll": {}}}},
+    )
+
+    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client.service = fake_service
+
+    def client_factory(wsdl, transport):
+        fake_client.transport = transport
+        return fake_client
+
+    client = CucmAxlClient(
+        wsdl_path=TEST_WSDL_PATH,
+        host="publisher.example.internal",
+        port=8443,
+        username="user",
+        password="not-used-in-tests",
+        verify_tls=False,
+        legacy_tls_compatibility=True,
+        legacy_tls_ciphers="AES128-SHA:@SECLEVEL=0",
+        session_factory=requests.Session,
+        transport_factory=FakeTransport,
+        client_factory=client_factory,
+    )
+
+    assert client.supports_apply_line() is False
+
+    session = fake_client.transport.kwargs["session"]
+    adapter = session.get_adapter("https://publisher.example.internal")
+
+    assert isinstance(adapter, TlsCompatibilityAdapter)
+    assert adapter._ssl_context.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert adapter._ssl_context.maximum_version == ssl.TLSVersion.TLSv1_2
+    assert adapter._ssl_context.verify_mode == ssl.CERT_NONE
+    assert any(cipher["name"] == "AES128-SHA" for cipher in adapter._ssl_context.get_ciphers())
 
 
 def _transient_update(attempts: dict[str, int]):

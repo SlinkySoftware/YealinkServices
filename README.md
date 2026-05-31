@@ -43,6 +43,8 @@ CUCM_AXL_USERNAME=svc_phone_diversion_axl
 CUCM_AXL_PASSWORD=change-me
 CUCM_AXL_VERIFY_TLS=false
 CUCM_AXL_TIMEOUT_SECONDS=10
+CUCM_AXL_LEGACY_TLS_COMPATIBILITY=false
+CUCM_AXL_LEGACY_TLS_CIPHERS=AES128-SHA:@SECLEVEL=0
 CUCM_ROUTE_PARTITION=INTERNAL
 CUCM_APPLY_LINE_AFTER_UPDATE=true
 AXL_WSDL_PATH=/opt/yealinkService/wsdl/AXLAPI.wsdl
@@ -63,6 +65,13 @@ PHONE_SERVICES_FULLSCREEN_LOGO_URL=http://phoneservices.example.internal/static/
 ```
 
 The handset templates default to text branding. The logo URLs are exposed in template context so a handset-tested image workflow can be enabled without changing the service contract.
+
+Legacy CUCM TLS compatibility:
+
+- Leave `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=false` unless the AXL endpoint rejects modern OpenSSL 3 handshakes.
+- Enable `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=true` only for older CUCM HTTPS listeners that require TLS 1.2 with legacy RSA CBC ciphers.
+- `CUCM_AXL_LEGACY_TLS_CIPHERS` defaults to `AES128-SHA:@SECLEVEL=0`, which matches older CUCM deployments that only accept `TLS_RSA_WITH_AES_128_CBC_SHA`.
+- This compatibility mode is scoped to the CUCM AXL client only, but it intentionally lowers TLS security for that connection and should be treated as an interoperability workaround.
 
 ## Local setup
 
@@ -88,6 +97,7 @@ python manage.py check
 - The service keeps no user-flow state outside process memory.
 - The only database dependency is the minimal Django SQLite database file created for framework state; the diversion workflow itself does not use models or persistent application data.
 - The CUCM client escapes leading `+` digits before `getLine`, `updateLine`, and `applyLine` requests.
+- If CUCM AXL only offers legacy TLS 1.2 RSA CBC suites, set `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=true` in the deployment environment file and restart the service.
 
 ## Handset testing
 

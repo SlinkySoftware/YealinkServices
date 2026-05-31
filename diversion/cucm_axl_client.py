@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 import requests
 import urllib3
 from requests import Session
+from requests.adapters import HTTPAdapter
 from zeep import Client
 from zeep.exceptions import Fault, TransportError
 from zeep.helpers import serialize_object
@@ -15,6 +17,27 @@ from zeep.transports import Transport
 
 AXL_BINDING = "{http://www.cisco.com/AXLAPIService/}AXLAPIBinding"
 TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
+DEFAULT_LEGACY_TLS_CIPHERS = "AES128-SHA:@SECLEVEL=0"
+
+
+class TlsCompatibilityAdapter(HTTPAdapter):
+    def __init__(self, ssl_context: ssl.SSLContext, **kwargs: Any) -> None:
+        self._ssl_context = ssl_context
+        super().__init__(**kwargs)
+
+    def init_poolmanager(
+        self,
+        connections: int,
+        maxsize: int,
+        block: bool = False,
+        **pool_kwargs: Any,
+    ) -> None:
+        pool_kwargs["ssl_context"] = self._ssl_context
+        super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
+        proxy_kwargs["ssl_context"] = self._ssl_context
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
 class CucmAxlError(RuntimeError):
@@ -43,6 +66,8 @@ class CucmAxlClient:
         password: str,
         verify_tls: bool,
         timeout_seconds: int = 10,
+        legacy_tls_compatibility: bool = False,
+        legacy_tls_ciphers: str = DEFAULT_LEGACY_TLS_CIPHERS,
         session_factory: Callable[[], Session] = requests.Session,
         transport_factory: type[Transport] = Transport,
         client_factory: type[Client] = Client,
@@ -54,6 +79,8 @@ class CucmAxlClient:
         self._password = password
         self._verify_tls = verify_tls
         self._timeout_seconds = timeout_seconds
+        self._legacy_tls_compatibility = legacy_tls_compatibility
+        self._legacy_tls_ciphers = legacy_tls_ciphers
         self._session_factory = session_factory
         self._transport_factory = transport_factory
         self._client_factory = client_factory
@@ -165,6 +192,8 @@ class CucmAxlClient:
         session.headers.update({"User-Agent": "yealinkService/1.0"})
         if not self._verify_tls:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        if self._legacy_tls_compatibility:
+            session.mount("https://", TlsCompatibilityAdapter(self._build_ssl_context()))
 
         transport = self._transport_factory(
             session=session,
@@ -179,6 +208,16 @@ class CucmAxlClient:
     def _is_transient_transport_error(exc: TransportError) -> bool:
         status_code = getattr(exc, "status_code", None)
         return status_code is None or status_code in TRANSIENT_HTTP_CODES
+
+    def _build_ssl_context(self) -> ssl.SSLContext:
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        context.set_ciphers(self._legacy_tls_ciphers)
+        if not self._verify_tls:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+        return context
 
     @staticmethod
     def _escape_pattern(pattern: str) -> str:

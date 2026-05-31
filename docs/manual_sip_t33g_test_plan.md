@@ -6,6 +6,7 @@
 2. Confirm the handset XML Browser URL is provisioned as `http://<services-base-url>/services/?mac=<MAC>&dn=<DN>&token=<TOKEN>`.
 3. Confirm Phone Manager localhost endpoints return valid device context and normalized destinations.
 4. Confirm CUCM AXL credentials can read and update the target DN in route partition `INTERNAL`.
+5. If CUCM AXL requires legacy TLS 1.2 RSA CBC ciphers, set `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=true` before testing and record the exact `CUCM_AXL_LEGACY_TLS_CIPHERS` value used.
 
 ## Validation flow
 
@@ -37,3 +38,6 @@ Expected: handset displays `Call Diversion is Unavailable` and technical detail 
 Expected: handset displays `Call Diversion is Unavailable` and the log captures the failed AXL operation.
 
 10. If testing image branding, enable the logo URL values and verify text fallback remains acceptable on SIP-T33G if image rendering is unreliable.
+
+11. When legacy TLS compatibility is enabled, repeat a status lookup and one enable or disable action.
+Expected: handset flow succeeds normally, and the server log does not show SSL handshake failures for the AXL call.

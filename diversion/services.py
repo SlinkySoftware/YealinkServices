@@ -532,6 +532,8 @@ def get_diversion_service() -> CallDiversionService:
                 password=settings.CUCM_AXL_PASSWORD,
                 verify_tls=settings.CUCM_AXL_VERIFY_TLS,
                 timeout_seconds=settings.CUCM_AXL_TIMEOUT_SECONDS,
+                legacy_tls_compatibility=settings.CUCM_AXL_LEGACY_TLS_COMPATIBILITY,
+                legacy_tls_ciphers=settings.CUCM_AXL_LEGACY_TLS_CIPHERS,
             ),
             route_partition_name=settings.CUCM_ROUTE_PARTITION,
             cfa_cache=InMemoryCfaCache(settings.CFA_CACHE_TTL_SECONDS),
