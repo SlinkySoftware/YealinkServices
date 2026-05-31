@@ -9,7 +9,12 @@ from django.test import Client, RequestFactory, override_settings
 from diversion.cucm_axl_client import CallForwardAllState
 from diversion.phone_manager_client import DeviceContext
 from diversion.services import DiversionStatus
-from diversion.yealink_xml import HandsetRequestParams, build_screen_context, parse_handset_request
+from diversion.yealink_xml import (
+    HandsetRequestParams,
+    build_screen_context,
+    numeric_destination_value,
+    parse_handset_request,
+)
 
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "yealink"
@@ -24,12 +29,16 @@ def example_params() -> HandsetRequestParams:
 
 
 def base_context(**extra):
+    context = {
+        "dn": "+61288836500",
+        "diversion_destination": "+61299991234",
+        "normalized_destination": "+61299991234",
+        "default_destination": "61299991234",
+    }
+    context.update(extra)
     return build_screen_context(
         example_params(),
-        dn="+61288836500",
-        normalized_destination="+61299991234",
-        default_destination="+61299991234",
-        **extra,
+        **context,
     )
 
 
@@ -50,7 +59,7 @@ def base_context(**extra):
     ],
 )
 def test_templates_render_expected_xml(template_name, fixture_name) -> None:
-    context = base_context()
+    context = base_context(diversion_destination="None") if fixture_name == "status_off.xml" else base_context()
     rendered = render_to_string(template_name, context).strip()
     expected = (FIXTURE_DIR / fixture_name).read_text().strip()
     assert rendered == expected
@@ -115,8 +124,51 @@ def test_status_view_renders_diverted_screen(monkeypatch) -> None:
         {"mac": "805EC0ABCDEF", "dn": "+61288836500", "token": "abcd1234"},
     )
     assert response.status_code == 200
-    assert b"Status: Diverted" in response.content
+    assert b"Divert: +61299991234" in response.content
     assert b"+61299991234" in response.content
+
+
+@override_settings(
+    PHONE_SERVICES_BASE_URL="http://phoneservices.example.internal/services/",
+    PHONE_SERVICES_COMPANY_NAME="ExampleCorp",
+)
+def test_enable_view_prepopulates_numeric_destination(monkeypatch) -> None:
+    class FakeService:
+        def get_status(self, mac, dn, token, audit_context, bypass_cache=False, action="status"):
+            return DiversionStatus(
+                device_context=DeviceContext(
+                    mac="805EC0ABCDEF",
+                    model="SIP-T33G",
+                    dn="+61288836500",
+                    sip_username=None,
+                    line_count=1,
+                    device_name=None,
+                    site="2SYA",
+                    dial_plan_id=None,
+                    message="OK",
+                ),
+                line_state=CallForwardAllState(
+                    destination="+61299991234",
+                    calling_search_space_name="INTERNAL_CSS",
+                    secondary_calling_search_space_name="SECONDARY_CSS",
+                ),
+            )
+
+    monkeypatch.setattr("diversion.views.get_diversion_service", lambda: FakeService())
+
+    client = Client()
+    response = client.get(
+        "/services/enable/",
+        {"mac": "805EC0ABCDEF", "dn": "+61288836500", "token": "abcd1234"},
+    )
+    assert response.status_code == 200
+    assert b"<DefaultValue>61299991234</DefaultValue>" in response.content
+    assert b"<InputFlags>N</InputFlags>" in response.content
+
+
+def test_numeric_destination_value_strips_non_digits() -> None:
+    assert numeric_destination_value("+61 29999-1234") == "61299991234"
+    assert numeric_destination_value(None) == ""
 
 
 @override_settings(

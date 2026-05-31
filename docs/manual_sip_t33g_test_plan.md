@@ -11,22 +11,22 @@
 ## Validation flow
 
 1. Open the Yealink XML Browser on a handset with diversion disabled.
-Expected: branded status page shows `Status: Not diverted` and offers `Divert`, `Refresh`, and `Exit` actions.
+Expected: branded status page shows `Divert: None` and offers `Divert` and `Refresh`, with bottom softkeys for the same actions.
 
 2. Select `Divert`.
-Expected: input screen opens and pre-fills the current destination when diversion is already enabled.
+Expected: input screen accepts numbers only and, when diversion is already enabled, pre-fills the current destination in digits-only format.
 
 3. Enter an invalid destination shorter than five digits.
 Expected: handset displays `Invalid Destination Specified` for roughly three seconds and returns to the flow safely.
 
 4. Enter a valid destination that Phone Manager normalizes.
-Expected: handset displays `Call Diversion Enabled`, then refreshes to `Status: Diverted` with the normalized destination.
+Expected: handset displays `Call Diversion Enabled`, then refreshes to `Divert: <normalized_destination>`.
 
 5. Re-submit the same destination.
 Expected: handset still shows a success result and CUCM state remains unchanged.
 
 6. Select `Disable` from an enabled line.
-Expected: handset displays `Call Diversion Disabled`, then refreshes to `Status: Not diverted`.
+Expected: handset displays `Call Diversion Disabled`, then refreshes to `Divert: None`.
 
 7. Select `Refresh` while diversion is enabled and again while disabled.
 Expected: cache is bypassed and the displayed state matches current CUCM data.

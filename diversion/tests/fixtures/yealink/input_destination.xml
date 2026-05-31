@@ -4,7 +4,7 @@
   <Prompt>Enter diversion destination</Prompt>
   <URL>http://phoneservices.example.internal/services/set/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URL>
   <Parameter>destination</Parameter>
-  <DefaultValue>+61299991234</DefaultValue>
-  <InputFlags>T</InputFlags>
+  <DefaultValue>61299991234</DefaultValue>
+  <InputFlags>N</InputFlags>
   <CancelURL>http://phoneservices.example.internal/services/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</CancelURL>
 </YealinkIPPhoneInputScreen>

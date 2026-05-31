@@ -5,6 +5,6 @@
   <URL>{{ set_url }}</URL>
   <Parameter>destination</Parameter>
   <DefaultValue>{{ default_destination }}</DefaultValue>
-  <InputFlags>T</InputFlags>
+  <InputFlags>N</InputFlags>
   <CancelURL>{{ cancel_url }}</CancelURL>
 </YealinkIPPhoneInputScreen>

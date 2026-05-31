@@ -2,8 +2,7 @@
 <YealinkIPPhoneTextMenu>
   <Title>{{ branding_title }}</Title>
   <Prompt>Extension: {{ dn }}
-Status: Diverted
-To: {{ normalized_destination }}</Prompt>
+Divert: {{ diversion_destination }}</Prompt>
   <MenuItem>
     <Prompt>Disable</Prompt>
     <URI>{{ disable_url }}</URI>
@@ -16,8 +15,19 @@ To: {{ normalized_destination }}</Prompt>
     <Prompt>Refresh</Prompt>
     <URI>{{ refresh_url }}</URI>
   </MenuItem>
-  <MenuItem>
-    <Prompt>Exit</Prompt>
-    <URI>{{ exit_url }}</URI>
-  </MenuItem>
+  <SoftKeyItem>
+    <Name>Disable</Name>
+    <URL>{{ disable_url }}</URL>
+    <Position>1</Position>
+  </SoftKeyItem>
+  <SoftKeyItem>
+    <Name>Edit</Name>
+    <URL>{{ enable_url }}</URL>
+    <Position>2</Position>
+  </SoftKeyItem>
+  <SoftKeyItem>
+    <Name>Refresh</Name>
+    <URL>{{ refresh_url }}</URL>
+    <Position>3</Position>
+  </SoftKeyItem>
 </YealinkIPPhoneTextMenu>

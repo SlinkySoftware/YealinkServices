@@ -171,3 +171,29 @@ def test_enable_diversion_rejects_short_destination() -> None:
             "1234",
             AUDIT_CONTEXT,
         )
+
+
+def test_enable_diversion_rejects_non_numeric_destination() -> None:
+    service = CallDiversionService(
+        phone_manager_client=FakePhoneManagerClient(),
+        cucm_axl_client=FakeCucmClient(
+            CallForwardAllState(
+                destination=None,
+                calling_search_space_name="INTERNAL_CSS",
+                secondary_calling_search_space_name="SECONDARY_CSS",
+            )
+        ),
+        route_partition_name="INTERNAL",
+        cfa_cache=InMemoryCfaCache(3600),
+        dry_run=False,
+        apply_line_after_update=True,
+    )
+
+    with pytest.raises(Exception):
+        service.enable_diversion(
+            "805EC0ABCDEF",
+            "+61288836500",
+            "abcd1234",
+            "12abc34",
+            AUDIT_CONTEXT,
+        )

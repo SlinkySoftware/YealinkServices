@@ -455,8 +455,7 @@ class CallDiversionService:
 
     def _validate_destination(self, entered_destination: str) -> None:
         stripped = entered_destination.strip()
-        digit_count = len(re.sub(r"\D", "", stripped))
-        if not stripped or digit_count < 5 or digit_count > 20:
+        if not stripped.isdigit() or len(stripped) < 5 or len(stripped) > 20:
             raise DiversionInvalidDestination("Invalid destination")
 
     @staticmethod

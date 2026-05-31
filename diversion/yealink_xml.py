@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from urllib.parse import unquote, urlencode, urljoin
 
 from django.conf import settings
@@ -57,6 +58,12 @@ def _normalize_mac(mac: str) -> str | None:
     if len(normalized_mac) != 12:
         return None
     return normalized_mac
+
+
+def numeric_destination_value(destination: str | None) -> str:
+    if not destination:
+        return ""
+    return re.sub(r"\D", "", destination)
 
 
 def build_screen_context(

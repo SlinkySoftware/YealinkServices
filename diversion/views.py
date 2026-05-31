@@ -13,6 +13,7 @@ from .yealink_xml import (
     HandsetRequestError,
     build_screen_context,
     get_query_param,
+    numeric_destination_value,
     parse_handset_request,
     render_xml_template,
 )
@@ -45,7 +46,7 @@ def enable_view(request: HttpRequest) -> HttpResponse:
         build_screen_context(
             params,
             dn=status.device_context.dn,
-            default_destination=status.line_state.destination or "",
+            default_destination=numeric_destination_value(status.line_state.destination),
         ),
     )
 
@@ -162,6 +163,7 @@ def _render_status(
     context = build_screen_context(
         params,
         dn=status.device_context.dn,
+        diversion_destination=status.line_state.destination or "None",
         normalized_destination=status.line_state.destination or "",
     )
     return render_xml_template(template_name, context)

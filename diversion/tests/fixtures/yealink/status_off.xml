@@ -2,7 +2,7 @@
 <YealinkIPPhoneTextMenu>
   <Title>ExampleCorp Phone Services</Title>
   <Prompt>Extension: +61288836500
-Status: Not diverted</Prompt>
+Divert: None</Prompt>
   <MenuItem>
     <Prompt>Divert</Prompt>
     <URI>http://phoneservices.example.internal/services/enable/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URI>
@@ -11,8 +11,14 @@ Status: Not diverted</Prompt>
     <Prompt>Refresh</Prompt>
     <URI>http://phoneservices.example.internal/services/refresh/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URI>
   </MenuItem>
-  <MenuItem>
-    <Prompt>Exit</Prompt>
-    <URI>http://phoneservices.example.internal/services/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URI>
-  </MenuItem>
+  <SoftKeyItem>
+    <Name>Divert</Name>
+    <URL>http://phoneservices.example.internal/services/enable/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URL>
+    <Position>1</Position>
+  </SoftKeyItem>
+  <SoftKeyItem>
+    <Name>Refresh</Name>
+    <URL>http://phoneservices.example.internal/services/refresh/?mac=805EC0ABCDEF&amp;dn=%2B61288836500&amp;token=abcd1234</URL>
+    <Position>3</Position>
+  </SoftKeyItem>
 </YealinkIPPhoneTextMenu>

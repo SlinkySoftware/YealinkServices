@@ -354,7 +354,7 @@ Display:
 ```text
 <company> Phone Services
 Extension: <DN>
-Status: Not diverted
+Divert: None
 ```
 
 Softkey/action:
@@ -362,7 +362,6 @@ Softkey/action:
 ```text
 Divert
 Refresh
-Exit
 ```
 
 ### 7.3 Status screen: diversion on
@@ -372,8 +371,7 @@ Display:
 ```text
 <company> Phone Services
 Extension: <DN>
-Status: Diverted
-To: <normalized_destination>
+Divert: <normalized_destination>
 ```
 
 Softkeys/actions:
@@ -382,7 +380,6 @@ Softkeys/actions:
 Disable
 Edit
 Refresh
-Exit
 ```
 
 ### 7.4 Input screen
@@ -392,6 +389,8 @@ Prompt for destination number.
 - Pressing OK submits.
 - Pressing X or Cancel cancels safely.
 - No confirmation screen is required before enabling diversion.
+- The handset input must be numeric-only.
+- When editing an active diversion, pre-fill the input with the current destination using digits only.
 
 ### 7.5 Disable flow
 
