@@ -525,7 +525,7 @@ def get_diversion_service() -> CallDiversionService:
                 timeout_seconds=settings.PHONE_MANAGER_TIMEOUT_SECONDS,
             ),
             cucm_axl_client=CucmAxlClient(
-                wsdl_path=settings.AXL_WSDL_PATH,
+                wsdl_root_path=str(settings.AXL_WSDL_ROOT),
                 host=settings.CUCM_AXL_HOST,
                 port=settings.CUCM_AXL_PORT,
                 username=settings.CUCM_AXL_USERNAME,

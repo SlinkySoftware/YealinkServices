@@ -50,7 +50,7 @@ The SIP-T33G display is 320 x 240 pixels. The service should support an corporat
 
 ### Cisco CUCM AXL
 
-CUCM AXL is a SOAP/XML provisioning API over HTTPS. Use CUCM 14 / AXL schema 14.0.
+CUCM AXL is a SOAP/XML provisioning API over HTTPS. Support CUCM versions by using vendored local WSDL/schema files and automatic runtime version detection.
 
 Use the CUCM Publisher:
 
@@ -58,15 +58,36 @@ Use the CUCM Publisher:
 https://<hostname>>:8443/axl/
 ```
 
-Use:
+Bootstrap discovery:
 
 ```text
-AXL schema version: 14.0
-SOAP namespace: http://www.cisco.com/AXL/API/14.0
-SOAPAction format: "CUCM:DB ver=14.0 <operation>"
+Send getCCMVersion to https://<hostname>:8443/axl/
+Use the special AXL namespace http://www.cisco.com/AXL/API/1.0
+Omit SOAPAction so CUCM applies its oldest supported schema for the bootstrap request
 ```
 
-Use a local CUCM AXL WSDL/schema file. Do not rely on internet access at runtime.
+After discovery, select the highest compatible vendored schema available in the local `wsdl/` directory and use that WSDL for subsequent Zeep requests. Do not rely on internet access at runtime.
+
+Vendored schemas available in this project:
+
+- 8.0
+- 8.5
+- 9.0
+- 9.1
+- 10.0
+- 10.5
+- 14.0
+
+Family mapping rules:
+
+- CUCM 8.0 to 8.1 uses vendored schema 8.0
+- CUCM 8.5 to 8.6 uses vendored schema 8.5
+- CUCM 9.0 uses vendored schema 9.0
+- CUCM 9.1 uses vendored schema 9.1
+- CUCM 10.0 uses vendored schema 10.0
+- CUCM 10.5 uses vendored schema 10.5
+- CUCM 11.x and 12.x use vendored schema 10.0
+- CUCM 14.x and 15.x use vendored schema 14.0
 
 Recommended Python SOAP client: `zeep`.
 
@@ -208,7 +229,6 @@ Required values:
 ```bash
 CUCM_AXL_HOST=<hostname>
 CUCM_AXL_PORT=8443
-CUCM_AXL_VERSION=14.0
 CUCM_AXL_USERNAME=svc_phone_diversion_axl
 CUCM_AXL_PASSWORD=change-me
 CUCM_AXL_VERIFY_TLS=false
@@ -515,7 +535,6 @@ PHONE_MANAGER_TIMEOUT_SECONDS=5
 
 CUCM_AXL_HOST=<hostname>
 CUCM_AXL_PORT=8443
-CUCM_AXL_VERSION=14.0
 CUCM_AXL_USERNAME=svc_phone_diversion_axl
 CUCM_AXL_PASSWORD=change-me
 CUCM_AXL_VERIFY_TLS=false

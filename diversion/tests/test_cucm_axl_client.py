@@ -13,15 +13,60 @@ from diversion.cucm_axl_client import (
     CucmAxlClient,
     CucmAxlError,
     TlsCompatibilityAdapter,
+    resolve_axl_schema_version,
 )
 
 
-TEST_WSDL_PATH = str(Path(__file__).resolve().parent / "fixtures" / "AXLAPI.wsdl")
+TEST_WSDL_ROOT = Path(__file__).resolve().parents[2] / "wsdl"
 
 
 class FakeTransport:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+
+
+class FakeVersionResponse:
+    def __init__(self, text: str, status_code: int = 200):
+        self.text = text
+        self.status_code = status_code
+
+
+class FakeBootstrapSession:
+    def __init__(self, cucm_version: str, status_code: int = 200):
+        self.auth = None
+        self.verify = True
+        self.headers = {}
+        self.post_calls = []
+        self._cucm_version = cucm_version
+        self._status_code = status_code
+
+    def mount(self, prefix, adapter):
+        return None
+
+    def post(self, url, data, headers, timeout):
+        self.post_calls.append(
+            {
+                "url": url,
+                "data": data,
+                "headers": headers,
+                "timeout": timeout,
+            }
+        )
+        return FakeVersionResponse(
+            text=(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
+                "<soapenv:Body>"
+                "<ns:getCCMVersionResponse xmlns:ns=\"http://www.cisco.com/AXL/API/1.0\">"
+                "<return><componentVersion><version>"
+                f"{self._cucm_version}"
+                "</version></componentVersion></return>"
+                "</ns:getCCMVersionResponse>"
+                "</soapenv:Body>"
+                "</soapenv:Envelope>"
+            ),
+            status_code=self._status_code,
+        )
 
 
 class FakeZeepClient:
@@ -43,13 +88,14 @@ def attach_axl_operations(service, **operations):
 
 
 def build_client(fake_client: FakeZeepClient) -> CucmAxlClient:
+    fake_session = FakeBootstrapSession("14.0.1.11900-6")
     client_kwargs = {
-        "wsdl_path": TEST_WSDL_PATH,
+        "wsdl_root_path": str(TEST_WSDL_ROOT),
         "host": "publisher.example.internal",
         "port": 8443,
         "username": "user",
         "verify_tls": False,
-        "session_factory": requests.Session,
+        "session_factory": lambda: fake_session,
         "transport_factory": FakeTransport,
         "client_factory": lambda wsdl, transport: fake_client,
     }
@@ -80,7 +126,7 @@ def test_get_line_returns_call_forward_state() -> None:
         },
     )
 
-    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
     fake_client.service = fake_service
     client = build_client(fake_client)
 
@@ -118,7 +164,7 @@ def test_update_line_retries_transient_failures() -> None:
         updateLine=lambda **kwargs: _transient_update(attempts),
     )
 
-    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
     fake_client.service = fake_service
     client = build_client(fake_client)
 
@@ -137,7 +183,7 @@ def test_supports_apply_line_false_when_operation_missing() -> None:
         getLine=lambda **kwargs: {"return": {"line": {"callForwardAll": {}}}},
     )
 
-    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
     fake_client.service = fake_service
     client = build_client(fake_client)
 
@@ -153,7 +199,7 @@ def test_legacy_tls_compatibility_mounts_custom_ssl_context() -> None:
         getLine=lambda **kwargs: {"return": {"line": {"callForwardAll": {}}}},
     )
 
-    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
     fake_client.service = fake_service
 
     def client_factory(wsdl, transport):
@@ -161,7 +207,7 @@ def test_legacy_tls_compatibility_mounts_custom_ssl_context() -> None:
         return fake_client
 
     client = CucmAxlClient(
-        wsdl_path=TEST_WSDL_PATH,
+        wsdl_root_path=str(TEST_WSDL_ROOT),
         host="publisher.example.internal",
         port=8443,
         username="user",
@@ -173,6 +219,7 @@ def test_legacy_tls_compatibility_mounts_custom_ssl_context() -> None:
         transport_factory=FakeTransport,
         client_factory=client_factory,
     )
+    client._discover_cucm_version = lambda session: "14.0.1.11900-6"
 
     assert client.supports_apply_line() is False
 
@@ -202,7 +249,7 @@ def test_fault_logging_includes_fault_detail(caplog: pytest.LogCaptureFixture) -
         getLine=raise_fault,
     )
 
-    fake_client = FakeZeepClient(wsdl=TEST_WSDL_PATH, transport=FakeTransport())
+    fake_client = FakeZeepClient(wsdl="", transport=FakeTransport())
     fake_client.service = fake_service
     client = build_client(fake_client)
 
@@ -213,6 +260,73 @@ def test_fault_logging_includes_fault_detail(caplog: pytest.LogCaptureFixture) -
     assert "operation=getLine" in caplog.text
     assert '"axlcode": "5007"' in caplog.text
     assert '"axlmessage": "Line not found"' in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("cucm_version", "expected_schema_version"),
+    [
+        ("8.0.3.20000-2", "8.0"),
+        ("8.6.2.22900-9", "8.5"),
+        ("9.0.1.10000-37", "9.0"),
+        ("9.1.2.10000-28", "9.1"),
+        ("10.0.1.10000-20", "10.0"),
+        ("10.5.2.12901-1", "10.5"),
+        ("11.5.1.18900-132", "10.0"),
+        ("12.5.1.19000-146", "10.0"),
+        ("14.0.1.11900-6", "14.0"),
+        ("15.0.1.13010-1", "14.0"),
+    ],
+)
+def test_resolve_axl_schema_version_maps_supported_families(
+    cucm_version: str,
+    expected_schema_version: str,
+) -> None:
+    assert resolve_axl_schema_version(cucm_version) == expected_schema_version
+
+
+def test_resolve_axl_schema_version_rejects_unsupported_family() -> None:
+    with pytest.raises(CucmAxlError, match="No supported vendored AXL schema mapping"):
+        resolve_axl_schema_version("13.0.1.10000-1")
+
+
+def test_client_bootstraps_cucm_version_and_selects_local_wsdl() -> None:
+    class FakeService:
+        pass
+
+    fake_service = attach_axl_operations(
+        FakeService(),
+        getLine=lambda **kwargs: {"return": {"line": {"callForwardAll": {}}}},
+    )
+    fake_session = FakeBootstrapSession("12.5.1.19000-146")
+    created_client = {}
+
+    def client_factory(wsdl, transport):
+        fake_client = FakeZeepClient(wsdl=wsdl, transport=transport)
+        fake_client.service = fake_service
+        created_client["client"] = fake_client
+        return fake_client
+
+    client = CucmAxlClient(
+        wsdl_root_path=str(TEST_WSDL_ROOT),
+        host="publisher.example.internal",
+        port=8443,
+        username="user",
+        password="not-used-in-tests",
+        verify_tls=False,
+        session_factory=lambda: fake_session,
+        transport_factory=FakeTransport,
+        client_factory=client_factory,
+    )
+
+    assert client.supports_apply_line() is False
+    assert created_client["client"].wsdl == str(TEST_WSDL_ROOT / "10.0" / "AXLAPI.wsdl")
+    assert fake_session.post_calls[0]["url"] == "https://publisher.example.internal:8443/axl/"
+    assert fake_session.post_calls[0]["headers"] == {
+        "Accept": "text/xml",
+        "Content-Type": "text/xml;charset=UTF-8",
+    }
+    assert "SOAPAction" not in fake_session.post_calls[0]["headers"]
+    assert "http://www.cisco.com/AXL/API/1.0" in fake_session.post_calls[0]["data"]
 
 
 def _transient_update(attempts: dict[str, int]):

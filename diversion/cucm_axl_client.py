@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 import requests
 import urllib3
@@ -20,6 +23,18 @@ from zeep.transports import Transport
 AXL_BINDING = "{http://www.cisco.com/AXLAPIService/}AXLAPIBinding"
 TRANSIENT_HTTP_CODES = {408, 429, 500, 502, 503, 504}
 DEFAULT_LEGACY_TLS_CIPHERS = "AES128-SHA:@SECLEVEL=0"
+BOOTSTRAP_NAMESPACE = "http://www.cisco.com/AXL/API/1.0"
+WSDL_FILENAME = "AXLAPI.wsdl"
+DETECTED_VERSION_PATTERN = re.compile(r"^\s*(\d+)\.(\d+)")
+WSDL_DIRECTORY_BY_SCHEMA_VERSION = {
+    "8.0": "8.0",
+    "8.5": "8.5",
+    "9.0": "9.0",
+    "9.1": "9.1",
+    "10.0": "10.0",
+    "10.5": "10.5",
+    "14.0": "14",
+}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -59,10 +74,56 @@ class CallForwardAllState:
         return bool(self.destination)
 
 
+def resolve_axl_schema_version(cucm_version: str) -> str:
+    match = DETECTED_VERSION_PATTERN.match(cucm_version)
+    if match is None:
+        raise CucmAxlError(f"Unsupported CUCM version string: {cucm_version!r}")
+
+    major = int(match.group(1))
+    minor = int(match.group(2))
+
+    if major == 8:
+        return "8.0" if minor < 5 else "8.5"
+    if major == 9:
+        return "9.0" if minor == 0 else "9.1"
+    if major == 10:
+        return "10.0" if minor == 0 else "10.5"
+    if major in {11, 12}:
+        return "10.0"
+    if major in {14, 15}:
+        return "14.0"
+
+    raise CucmAxlError(
+        f"No supported vendored AXL schema mapping for CUCM version {cucm_version!r}"
+    )
+
+
+def resolve_axl_wsdl_path(wsdl_root_path: str | Path, schema_version: str) -> Path:
+    try:
+        directory_name = WSDL_DIRECTORY_BY_SCHEMA_VERSION[schema_version]
+    except KeyError as exc:
+        raise CucmAxlError(f"Unsupported vendored AXL schema version {schema_version!r}") from exc
+
+    wsdl_path = Path(wsdl_root_path) / directory_name / WSDL_FILENAME
+    if not wsdl_path.is_file():
+        raise CucmAxlError(
+            f"Vendored AXL WSDL not found for schema {schema_version!r}: {wsdl_path}"
+        )
+    return wsdl_path
+
+
+def available_axl_schema_versions(wsdl_root_path: str | Path) -> list[str]:
+    return [
+        schema_version
+        for schema_version in WSDL_DIRECTORY_BY_SCHEMA_VERSION
+        if (Path(wsdl_root_path) / WSDL_DIRECTORY_BY_SCHEMA_VERSION[schema_version] / WSDL_FILENAME).is_file()
+    ]
+
+
 class CucmAxlClient:
     def __init__(
         self,
-        wsdl_path: str,
+        wsdl_root_path: str,
         host: str,
         port: int,
         username: str,
@@ -75,7 +136,7 @@ class CucmAxlClient:
         transport_factory: type[Transport] = Transport,
         client_factory: type[Client] = Client,
     ) -> None:
-        self._wsdl_path = wsdl_path
+        self._wsdl_root_path = wsdl_root_path
         self._host = host
         self._port = port
         self._username = username
@@ -89,6 +150,9 @@ class CucmAxlClient:
         self._client_factory = client_factory
         self._client: Any | None = None
         self._service: Any | None = None
+        self._detected_cucm_version: str | None = None
+        self._schema_version: str | None = None
+        self._resolved_wsdl_path: Path | None = None
 
     @property
     def endpoint(self) -> str:
@@ -227,6 +291,28 @@ class CucmAxlClient:
         if self._service is not None:
             return self._service
 
+        session = self._build_session()
+        self._detected_cucm_version = self._discover_cucm_version(session)
+        self._schema_version = resolve_axl_schema_version(self._detected_cucm_version)
+        self._resolved_wsdl_path = resolve_axl_wsdl_path(self._wsdl_root_path, self._schema_version)
+        LOGGER.info(
+            "Resolved CUCM AXL schema endpoint=%s cucm_version=%s schema_version=%s wsdl_path=%s",
+            self.endpoint,
+            self._detected_cucm_version,
+            self._schema_version,
+            self._resolved_wsdl_path,
+        )
+
+        transport = self._transport_factory(
+            session=session,
+            timeout=self._timeout_seconds,
+            operation_timeout=self._timeout_seconds,
+        )
+        self._client = self._client_factory(wsdl=str(self._resolved_wsdl_path), transport=transport)
+        self._service = self._client.create_service(AXL_BINDING, self.endpoint)
+        return self._service
+
+    def _build_session(self) -> Session:
         session = self._session_factory()
         session.auth = (self._username, self._password)
         session.verify = self._verify_tls
@@ -235,15 +321,118 @@ class CucmAxlClient:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         if self._legacy_tls_compatibility:
             session.mount("https://", TlsCompatibilityAdapter(self._build_ssl_context()))
+        return session
 
-        transport = self._transport_factory(
-            session=session,
-            timeout=self._timeout_seconds,
-            operation_timeout=self._timeout_seconds,
+    def _discover_cucm_version(self, session: Session) -> str:
+        request_body = self._build_get_ccm_version_request()
+        last_exception: Exception | None = None
+
+        for attempt in range(1, 4):
+            try:
+                response = session.post(
+                    self.endpoint,
+                    data=request_body,
+                    headers={
+                        "Accept": "text/xml",
+                        "Content-Type": "text/xml;charset=UTF-8",
+                    },
+                    timeout=self._timeout_seconds,
+                )
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                if attempt == 3:
+                    LOGGER.exception(
+                        "CUCM getCCMVersion connection error endpoint=%s attempt=%s",
+                        self.endpoint,
+                        attempt,
+                    )
+                    raise CucmAxlError(f"CUCM getCCMVersion connection error: {exc}") from exc
+                last_exception = exc
+                continue
+            except requests.RequestException as exc:
+                LOGGER.exception(
+                    "CUCM getCCMVersion request error endpoint=%s attempt=%s",
+                    self.endpoint,
+                    attempt,
+                )
+                raise CucmAxlError(f"CUCM getCCMVersion request error: {exc}") from exc
+
+            fault_message = self._extract_soap_fault_message(response.text)
+            if response.status_code >= 400:
+                if response.status_code in TRANSIENT_HTTP_CODES and attempt < 3:
+                    last_exception = CucmAxlError(
+                        f"Transient CUCM getCCMVersion HTTP {response.status_code}: {fault_message or response.text}"
+                    )
+                    continue
+                LOGGER.error(
+                    "CUCM getCCMVersion HTTP error endpoint=%s attempt=%s status_code=%s fault=%s body=%s",
+                    self.endpoint,
+                    attempt,
+                    response.status_code,
+                    fault_message,
+                    self._format_for_log(response.text),
+                )
+                detail = fault_message or f"HTTP {response.status_code}"
+                raise CucmAxlError(f"CUCM getCCMVersion failed: {detail}")
+
+            if fault_message:
+                LOGGER.error(
+                    "CUCM getCCMVersion SOAP fault endpoint=%s attempt=%s fault=%s body=%s",
+                    self.endpoint,
+                    attempt,
+                    fault_message,
+                    self._format_for_log(response.text),
+                )
+                raise CucmAxlError(f"CUCM getCCMVersion fault: {fault_message}")
+
+            version = self._extract_soap_value(response.text, "version")
+            if version:
+                return version
+
+            LOGGER.error(
+                "Unexpected CUCM getCCMVersion response structure endpoint=%s attempt=%s body=%s",
+                self.endpoint,
+                attempt,
+                self._format_for_log(response.text),
+            )
+            raise CucmAxlError("Unexpected getCCMVersion response structure")
+
+        raise CucmAxlError(f"CUCM getCCMVersion failed after retries: {last_exception}")
+
+    @staticmethod
+    def _build_get_ccm_version_request() -> str:
+        return (
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" '
+            f'xmlns:ns="{BOOTSTRAP_NAMESPACE}">'
+            "<soapenv:Header/>"
+            "<soapenv:Body>"
+            "<ns:getCCMVersion>"
+            "<processNodeName></processNodeName>"
+            "</ns:getCCMVersion>"
+            "</soapenv:Body>"
+            "</soapenv:Envelope>"
         )
-        self._client = self._client_factory(wsdl=self._wsdl_path, transport=transport)
-        self._service = self._client.create_service(AXL_BINDING, self.endpoint)
-        return self._service
+
+    @staticmethod
+    def _extract_soap_fault_message(response_body: str) -> str | None:
+        return CucmAxlClient._extract_soap_value(response_body, "faultstring")
+
+    @staticmethod
+    def _extract_soap_value(response_body: str, local_name: str) -> str | None:
+        try:
+            root = ElementTree.fromstring(response_body)
+        except ElementTree.ParseError:
+            return None
+
+        for element in root.iter():
+            if element.tag.rsplit("}", 1)[-1] != local_name:
+                continue
+            if element.text is None:
+                return None
+            value = element.text.strip()
+            if value:
+                return value
+        return None
 
     @staticmethod
     def _is_transient_transport_error(exc: TransportError) -> bool:

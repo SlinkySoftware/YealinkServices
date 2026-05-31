@@ -1,8 +1,7 @@
-from pathlib import Path
-
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
+from .cucm_axl_client import available_axl_schema_versions
 from .logging_utils import new_request_id, source_ip_from_request
 from .services import (
     DiversionInvalidDestination,
@@ -123,12 +122,13 @@ def refresh_view(request: HttpRequest) -> HttpResponse:
 
 
 def health_view(request: HttpRequest) -> JsonResponse:
-    wsdl_path = Path(settings.AXL_WSDL_PATH)
+    available_wsdl_versions = available_axl_schema_versions(settings.AXL_WSDL_ROOT)
     return JsonResponse(
         {
             "status": "ok",
             "service": "yealinkService",
-            "wsdl_present": wsdl_path.is_file(),
+            "wsdl_present": bool(available_wsdl_versions),
+            "wsdl_versions": available_wsdl_versions,
             "base_url": settings.PHONE_SERVICES_BASE_URL,
             "root_mount_enabled": settings.PHONE_SERVICES_ENABLE_ROOT_MOUNT,
         }

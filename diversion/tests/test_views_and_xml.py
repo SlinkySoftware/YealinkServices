@@ -118,3 +118,14 @@ def test_status_view_renders_diverted_screen(monkeypatch) -> None:
     assert response.status_code == 200
     assert b"Status: Diverted" in response.content
     assert b"+61299991234" in response.content
+
+
+@override_settings(AXL_WSDL_ROOT=Path(__file__).resolve().parents[2] / "wsdl")
+def test_health_view_reports_vendored_wsdl_versions() -> None:
+    client = Client()
+    response = client.get("/services/health/")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["wsdl_present"] is True
+    assert payload["wsdl_versions"] == ["8.0", "8.5", "9.0", "9.1", "10.0", "10.5", "14.0"]

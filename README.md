@@ -1,12 +1,12 @@
 # yealinkService
 
-yealinkService is a standalone Django service that exposes Yealink XML Browser screens for Call Forward All management on SIP-T33G handsets and updates Cisco CUCM 14 through AXL.
+yealinkService is a standalone Django service that exposes Yealink XML Browser screens for Call Forward All management on SIP-T33G handsets and updates Cisco CUCM through AXL.
 
 ## Features
 
 - Yealink XML Browser responses for status, enable, disable, refresh, and errors.
 - Phone Manager integration over localhost for device validation and destination normalization.
-- CUCM AXL integration using the vendored CUCM 14 WSDL under `wsdl/`.
+- CUCM AXL integration using vendored WSDLs under `wsdl/`, with automatic CUCM version discovery and compatible schema selection.
 - In-memory CFA caching with refresh bypass and cache invalidation after updates.
 - Plain-text JSON-line audit logging to a configurable file.
 - Dry-run mode that still validates handset context and reads CUCM state without writing changes.
@@ -38,7 +38,6 @@ PHONE_MANAGER_TIMEOUT_SECONDS=5
 
 CUCM_AXL_HOST=cucm-publisher.example.internal
 CUCM_AXL_PORT=8443
-CUCM_AXL_VERSION=14.0
 CUCM_AXL_USERNAME=svc_phone_diversion_axl
 CUCM_AXL_PASSWORD=change-me
 CUCM_AXL_VERIFY_TLS=false
@@ -47,7 +46,6 @@ CUCM_AXL_LEGACY_TLS_COMPATIBILITY=false
 CUCM_AXL_LEGACY_TLS_CIPHERS=AES128-SHA:@SECLEVEL=0
 CUCM_ROUTE_PARTITION=INTERNAL
 CUCM_APPLY_LINE_AFTER_UPDATE=true
-AXL_WSDL_PATH=/opt/yealinkService/wsdl/AXLAPI.wsdl
 
 CFA_CACHE_TTL_SECONDS=3600
 DRY_RUN=false
@@ -65,6 +63,8 @@ PHONE_SERVICES_FULLSCREEN_LOGO_URL=http://phoneservices.example.internal/static/
 ```
 
 The handset templates default to text branding. The logo URLs are exposed in template context so a handset-tested image workflow can be enabled without changing the service contract.
+
+The service sends a bootstrap `getCCMVersion` request to CUCM, then selects the highest compatible vendored schema from `wsdl/`. The current vendored schema set is `8.0`, `8.5`, `9.0`, `9.1`, `10.0`, `10.5`, and `14.0`. That means CUCM 11.x and 12.x use the vendored `10.0` schema, while CUCM 15.x uses the vendored `14.0` schema.
 
 Legacy CUCM TLS compatibility:
 
