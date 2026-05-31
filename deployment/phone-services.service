@@ -1,14 +1,18 @@
 [Unit]
-Description=yealinkService Django application
-After=network.target
+Description=Yealink Phone Services Django application
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=yealinkservice
-Group=yealinkservice
+User=yealink
+Group=yealink
 WorkingDirectory=/opt/yealinkService
 EnvironmentFile=/etc/yealinkService/phone-services.env
-ExecStart=/opt/yealinkService/.venv/bin/gunicorn yealinkService.wsgi:application --bind 127.0.0.1:8001 --workers 2
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=append:/var/log/yealinkService/diversion.log
+StandardError=append:/var/log/yealinkService/diversion.log
+ExecStart=/opt/yealinkService/.venv/bin/gunicorn --bind 127.0.0.1:8001 --workers 2 --timeout 60 --access-logfile /var/log/yealinkService/gunicorn-access.log --capture-output yealinkService.wsgi:application
 Restart=on-failure
 RestartSec=5
 

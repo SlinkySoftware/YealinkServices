@@ -92,6 +92,28 @@ python manage.py check
 
 ## Deployment notes
 
+### Bare-metal RHEL installation
+
+The RHEL installer is split into two phases. Phase 1 bootstraps the checkout into `/opt/yealinkService`, then hands off to the in-repo stage 2 installer that creates the `yealink` service account, Python virtual environment, systemd unit, nginx integration, and SELinux policy changes.
+
+Run phase 1 directly from GitHub as `root` or through `sudo`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SlinkySoftware/YealinkServices/master/scripts/install-rhel-baremetal.sh | sudo bash
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/SlinkySoftware/YealinkServices/master/scripts/install-rhel-baremetal.sh | sudo bash
+```
+
+Override the default install path or runtime account by exporting variables before invoking the script, for example:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SlinkySoftware/YealinkServices/master/scripts/install-rhel-baremetal.sh | sudo APP_DIR=/opt/yealinkService APP_USER=yealink bash
+```
+
+After installation, update `/etc/yealinkService/phone-services.env` with the real CUCM, Phone Manager, hostname, and optional branding settings, then restart `phone-services.service`.
+
 - Nginx must proxy `/services/` without rewriting the prefix.
 - The Django app itself can optionally mount at `/` for development by setting `PHONE_SERVICES_ENABLE_ROOT_MOUNT=true` and adjusting `PHONE_SERVICES_BASE_URL`.
 - The service keeps no user-flow state outside process memory.
