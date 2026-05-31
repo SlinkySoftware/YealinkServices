@@ -71,6 +71,8 @@ Legacy CUCM TLS compatibility:
 - Leave `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=false` unless the AXL endpoint rejects modern OpenSSL 3 handshakes.
 - Enable `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=true` only for older CUCM HTTPS listeners that require TLS 1.2 with legacy RSA CBC ciphers.
 - `CUCM_AXL_LEGACY_TLS_CIPHERS` defaults to `AES128-SHA:@SECLEVEL=0`, which matches older CUCM deployments that only accept `TLS_RSA_WITH_AES_128_CBC_SHA`.
+- On RHEL or Oracle Linux 9 hosts, older CUCM releases such as 10.5 may still fail the TLS handshake under the system `DEFAULT` crypto policy even with `CUCM_AXL_LEGACY_TLS_COMPATIBILITY=true`; switching the host crypto policy to `LEGACY` with `sudo update-crypto-policies --set LEGACY` and restarting `phone-services.service` may be required for interoperability.
+- This host-level workaround was required against a CUCM 10.5 deployment using a self-signed `sha1WithRSAEncryption` HTTPS certificate, but may not be necessary on newer CUCM releases such as 14.
 - This compatibility mode is scoped to the CUCM AXL client only, but it intentionally lowers TLS security for that connection and should be treated as an interoperability workaround.
 
 ## Local setup
