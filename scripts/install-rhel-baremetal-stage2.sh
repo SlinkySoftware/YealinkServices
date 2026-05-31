@@ -185,6 +185,10 @@ setup_virtualenv() {
 
 write_env_file() {
   log "Writing environment file: $ENV_FILE"
+  mkdir -p "$ENV_DIR"
+  chown root:"$APP_GROUP" "$ENV_DIR"
+  chmod 750 "$ENV_DIR"
+
   if [[ ! -f "$ENV_FILE" ]]; then
     cat > "$ENV_FILE" <<EOF
 PHONE_SERVICES_BASE_URL=http://phoneservices.example.internal/services/
