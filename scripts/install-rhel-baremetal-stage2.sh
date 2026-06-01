@@ -11,8 +11,7 @@ ENV_DIR="${ENV_DIR:-/etc/yealinkService}"
 ENV_FILE="${ENV_FILE:-$ENV_DIR/phone-services.env}"
 SYSTEMD_SERVICE_NAME="${SYSTEMD_SERVICE_NAME:-phone-services.service}"
 SYSTEMD_SERVICE_PATH="${SYSTEMD_SERVICE_PATH:-/etc/systemd/system/${SYSTEMD_SERVICE_NAME}}"
-NGINX_SERVER_CONF="${NGINX_SERVER_CONF:-/etc/nginx/conf.d/phonemanager.conf}"
-NGINX_INCLUDE_DIR="${NGINX_INCLUDE_DIR:-/etc/nginx/default.d}"
+NGINX_INCLUDE_DIR="${NGINX_INCLUDE_DIR:-/etc/nginx/conf.d/phonemanager.d}"
 NGINX_INCLUDE_FILE="${NGINX_INCLUDE_FILE:-$NGINX_INCLUDE_DIR/yealink-services-locations.conf}"
 APP_PORT="${APP_PORT:-8001}"
 LOG_DIR_WAS_PROVIDED=0
@@ -316,116 +315,43 @@ EOF
   chmod 644 "$NGINX_INCLUDE_FILE"
 }
 
-find_nginx_server_conf() {
-  local candidate
-
-  if [[ -f "$NGINX_SERVER_CONF" ]]; then
-    printf '%s\n' "$NGINX_SERVER_CONF"
-    return 0
-  fi
-
-  for candidate in /etc/nginx/conf.d/*.conf; do
-    [[ -f "$candidate" ]] || continue
-    if grep -q '^[[:space:]]*server[[:space:]]*{' "$candidate"; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-inject_nginx_include() {
-  local server_conf="$1"
-  local tmp_file
-
-  if grep -qF "include $NGINX_INCLUDE_FILE;" "$server_conf"; then
-    return
-  fi
-
-  tmp_file="$(mktemp)"
-  if ! awk -v include_line="    include $NGINX_INCLUDE_FILE;" '
-    BEGIN { in_server = 0; depth = 0; inserted = 0 }
-    {
-      line = $0
-
-      if (!inserted && !in_server && line ~ /^[[:space:]]*server[[:space:]]*\{/) {
-        in_server = 1
-      }
-
-      if (in_server) {
-        open_scan = line
-        close_scan = line
-        open_count = gsub(/\{/, "{", open_scan)
-        close_count = gsub(/\}/, "}", close_scan)
-
-        if (depth == 1 && close_count > 0 && !inserted) {
-          print include_line
-          inserted = 1
-        }
-
-        print line
-        depth += open_count - close_count
-
-        if (depth <= 0) {
-          in_server = 0
-          depth = 0
-        }
-
-        next
-      }
-
-      print line
-    }
-    END { if (!inserted) exit 1 }
-  ' "$server_conf" > "$tmp_file"; then
-    rm -f "$tmp_file"
-    echo "Unable to inject nginx include into $server_conf"
-    exit 1
-  fi
-
-  cat "$tmp_file" > "$server_conf"
-  rm -f "$tmp_file"
-}
-
 ensure_nginx_integration() {
-  local server_conf
-
   write_nginx_location_include
+}
 
-  if grep -R -qF -- "include $NGINX_INCLUDE_FILE;" /etc/nginx 2>/dev/null; then
-    return
+selinux_enabled() {
+  command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce)" != "Disabled" ]]
+}
+
+ensure_selinux_fcontext() {
+  local selinux_type="$1"
+  local path_expression="$2"
+
+  if semanage fcontext -l | grep -Fq "$path_expression"; then
+    semanage fcontext -m -t "$selinux_type" "$path_expression"
+  else
+    semanage fcontext -a -t "$selinux_type" "$path_expression"
   fi
-
-  if grep -R -qF -- "include $NGINX_INCLUDE_DIR/*.conf;" /etc/nginx 2>/dev/null; then
-    return
-  fi
-
-  if ! server_conf="$(find_nginx_server_conf)"; then
-    echo "Unable to locate an nginx server block to integrate with."
-    echo "Set NGINX_SERVER_CONF to the Phone Manager nginx server config and rerun."
-    exit 1
-  fi
-
-  log "Injecting yealink nginx include into existing server block: $server_conf"
-  inject_nginx_include "$server_conf"
 }
 
 configure_selinux() {
-  if ! command -v getenforce >/dev/null 2>&1 || [[ "$(getenforce)" == "Disabled" ]]; then
+  if ! selinux_enabled; then
     return
   fi
 
-  log "Configuring SELinux for nginx proxying and branding files"
+  log "Configuring SELinux for nginx proxying and application files"
   setsebool -P httpd_can_network_connect 1
+  ensure_selinux_fcontext usr_t "$APP_DIR(/.*)?"
+  ensure_selinux_fcontext httpd_sys_content_t "$STATIC_DIR(/.*)?"
+}
 
-  if semanage fcontext -l | grep -Fq "$BRANDING_DIR(/.*)?"; then
-    semanage fcontext -m -t httpd_sys_content_t "$BRANDING_DIR(/.*)?"
-  else
-    semanage fcontext -a -t httpd_sys_content_t "$BRANDING_DIR(/.*)?"
+restore_selinux_contexts() {
+  if ! selinux_enabled; then
+    return
   fi
 
-  restorecon -Rv "$BRANDING_DIR"
+  log "Restoring SELinux labels under $APP_DIR"
+  restorecon -Rv "$APP_DIR"
 }
 
 reload_services() {
@@ -469,6 +395,7 @@ main() {
   write_systemd_service
   ensure_nginx_integration
   configure_selinux
+  restore_selinux_contexts
   reload_services
 
   cat <<EOF
