@@ -176,23 +176,29 @@ def test_numeric_destination_value_strips_non_digits() -> None:
     PHONE_SERVICES_COMPANY_NAME="ExampleCorp",
 )
 @pytest.mark.parametrize(
-    "request_mac",
+    ("request_mac", "request_dn"),
     [
-        "C4:FC:22:4C:78:17",
-        "C4%3AFC%3A22%3A4C%3A78%3A17",
+        ("C4:FC:22:4C:78:17", "+61288836500"),
+        ("C4%3AFC%3A22%3A4C%3A78%3A17", "+61288836500"),
+        ("C4:FC:22:4C:78:17", "%2B61288836500"),
     ],
 )
-def test_parse_handset_request_normalizes_mac_and_generated_urls(request_mac: str) -> None:
+def test_parse_handset_request_normalizes_mac_and_generated_urls(
+    request_mac: str,
+    request_dn: str,
+) -> None:
     request = RequestFactory().get(
         "/services/",
-        {"mac": request_mac, "dn": "+61288836500", "token": "abcd1234"},
+        {"mac": request_mac, "dn": request_dn, "token": "abcd1234"},
     )
 
     params = parse_handset_request(request)
     context = build_screen_context(params)
 
     assert params.mac == "C4FC224C7817"
+    assert params.dn == "+61288836500"
     assert "mac=C4FC224C7817" in context["enable_url"]
+    assert "dn=%2B61288836500" in context["enable_url"]
     assert "%3A" not in context["enable_url"]
 
 

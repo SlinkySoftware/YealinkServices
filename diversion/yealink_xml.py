@@ -49,7 +49,11 @@ def parse_handset_request(request: HttpRequest) -> HandsetRequestParams:
     if normalized_mac is None:
         raise HandsetRequestError("Invalid handset MAC address")
 
-    return HandsetRequestParams(mac=normalized_mac, dn=dn, token=token)
+    normalized_dn = _normalize_dn(dn)
+    if normalized_dn is None:
+        raise HandsetRequestError("Invalid handset DN")
+
+    return HandsetRequestParams(mac=normalized_mac, dn=normalized_dn, token=token)
 
 
 def _normalize_mac(mac: str) -> str | None:
@@ -58,6 +62,13 @@ def _normalize_mac(mac: str) -> str | None:
     if len(normalized_mac) != 12:
         return None
     return normalized_mac
+
+
+def _normalize_dn(dn: str) -> str | None:
+    normalized_dn = unquote(dn).strip()
+    if normalized_dn == "":
+        return None
+    return normalized_dn
 
 
 def numeric_destination_value(destination: str | None) -> str:
